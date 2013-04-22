@@ -2,10 +2,15 @@
 
 import Text.ParserCombinators.Parsec
 import System.Environment
+import Debug.Trace
 import Control.Applicative ((<$>))
 import Control.Monad (unless, when, void, (=<<))
 import Data.IORef
 import Data.Maybe
+import Data.Sequence ((><))
+import qualified Data.Sequence as S
+import Data.Sequence
+import Data.Word
 
 main = do args <- getArgs
           if elem "-t" args
@@ -18,6 +23,9 @@ main = do args <- getArgs
               unless (isBalanced raw) $ error "unbalanced input"
               genST raw >>= printST
 
+data ProgramState = ProgramState (S.Seq Word8) (Maybe Node) Pointer
+
+type Pointer = Int
 genST chars = do ops <- sequence $ nodify . charToOpt <$> chars
                  void $ setNext ops
                  sequence_ $ setSelf <$> ops
@@ -27,17 +35,17 @@ genST chars = do ops <- sequence $ nodify . charToOpt <$> chars
 
 printST node@(Node {..}) = do
     next <- readIORef nNext
-        case next of
-            Nothing -> print nOp
-            Just n -> do
-                print nOp
-                self <- readIORef $ nSelf
-                nextJump <- readIORef $ nNextJump
-                prevJump <- readIORef $ nPrevJump
-                when (isJust self) $ print "self set"
-                when (isJust nextJump) $ print "next jump set"
-                when (isJust prevJump) $ print "prev jump set"
-                printST n
+    case next of
+        Nothing -> print nOp
+        Just n -> do
+            print nOp
+            self <- readIORef $ nSelf
+            nextJump <- readIORef $ nNextJump
+            prevJump <- readIORef $ nPrevJump
+            when (isJust self) $ print "self set"
+            when (isJust nextJump) $ print "next jump set"
+            when (isJust prevJump) $ print "prev jump set"
+            printST n
 
 nodify nOp = do
               nPrevJump <- newIORef Nothing
