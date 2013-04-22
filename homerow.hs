@@ -1,7 +1,120 @@
+{-# LANGUAGE RecordWildCards #-}
+
 import Text.ParserCombinators.Parsec
 import System.Environment
 import Control.Applicative ((<$>))
-import Control.Monad (when, void, (=<<))
+import Control.Monad (unless, when, void, (=<<))
+import Data.IORef
+import Data.Maybe
+
+main = do args <- getArgs
+          if elem "-t" args
+          then putStrLn $ "Tests pass: " ++ show runAllTests
+          else do
+              input <- readFile =<< head <$> getArgs
+              let raw = case parseHR input of
+                               Left e -> show e
+                               Right l -> concat l
+              unless (isBalanced raw) $ error "unbalanced input"
+              genST raw >>= printST
+
+genST chars = do ops <- sequence $ nodify . charToOpt <$> chars
+                 void $ setNext ops
+                 sequence_ $ setSelf <$> ops
+                 sequence_ $ setNextJump <$> ops
+                 sequence_ $ setPrevJump <$> ops
+                 return $ head ops
+
+printST node@(Node {..}) = do
+    next <- readIORef nNext
+        case next of
+            Nothing -> print nOp
+            Just n -> do
+                print nOp
+                self <- readIORef $ nSelf
+                nextJump <- readIORef $ nNextJump
+                prevJump <- readIORef $ nPrevJump
+                when (isJust self) $ print "self set"
+                when (isJust nextJump) $ print "next jump set"
+                when (isJust prevJump) $ print "prev jump set"
+                printST n
+
+nodify nOp = do
+              nPrevJump <- newIORef Nothing
+              nNextJump <- newIORef Nothing
+              nNext     <- newIORef Nothing
+              nSelf     <- newIORef Nothing
+              return Node {..}
+
+setSelf n@(Node{..}) = do let s = nSelf
+                          writeIORef s $ Just n
+                          return n
+
+setNext [] = return []
+setNext [n] = return [n]
+setNext (n1:n2:ns) = do void $ writeIORef (nNext n1) $ Just n2
+                        setNext $ n2 : ns
+
+setNextJump node = case nOp node of
+    JumpForward -> do next <- readIORef $ nNext node
+                      nextJump <- setNextJump' next 1
+                      void $ writeIORef (nNextJump node) nextJump
+                      return node
+    _ -> return node
+
+setNextJump' mb_node x = case mb_node of
+    Nothing -> error "impossible6: unbalanced jumps"
+    Just node -> do
+            nxt <- readIORef $ nNext node
+            case nxt of
+                Nothing -> case nOp node of
+                    JumpBack -> if x == 1
+                                then return $ Just node
+                                else error "impossible4: unbalanced jumps"
+                    _ -> error   "impossible5: unbalanced jumps"
+                Just next -> case nOp node of
+                    JumpBack -> if x == 1
+                                then return $ Just node
+                                else setNextJump' (Just next) (x - 1)
+                    JumpForward -> setNextJump' (Just next) (x + 1)
+                    _ -> setNextJump' (Just next) x
+
+setPrevJump node = case nOp node of
+    JumpForward -> do mbNextJump <- readIORef $ nNextJump node
+                      case mbNextJump of
+                          Nothing -> error "impossible7 unbalanced jumps"
+                          Just nextJump -> do
+                              void $ writeIORef (nPrevJump nextJump) $ Just node
+                      return node
+    _ -> return node
+
+data Node = Node
+    { nPrevJump :: IORef (Maybe Node)
+    , nNextJump :: IORef (Maybe Node)
+    , nNext     :: IORef (Maybe Node)
+    , nSelf     :: IORef (Maybe Node)
+    , nOp       :: Op
+    }
+
+charToOpt c = case c of
+    'a' -> JumpForward
+    ';' -> JumpBack
+    's' -> IncrementDataPointer
+    'd' -> DecrementDataPointer
+    'f' -> InputByte
+    'j' -> OutputByte
+    'k' -> IncrementByte
+    'l' -> DecrementByte
+
+data Op = IncrementDataPointer
+        | DecrementDataPointer
+        | IncrementByte
+        | DecrementByte
+        | InputByte
+        | OutputByte
+        | JumpForward
+        | JumpBack
+  deriving Show
 
 homerowFile = do code <- concat <$> many1 line
                  eof
@@ -12,7 +125,7 @@ line = do code <- sepBy (many (oneOf "asdfjkl;")) (many1 $ oneOf " \t")
           char '\n'
           return code
 
-comment = char '#' >> many (noneOf "\n")
+comment = oneOf "#-\"" >> many (noneOf "\n")
 
 parseHR input = parse homerowFile "so much fail" input
 
@@ -30,25 +143,6 @@ balance' = do
 balance = nonJumps >> optional (many balance') >> nonJumps >> eof
 
 nonJumps = many (oneOf "sdfjkl")
-
-main = do args <- getArgs
-          if elem "-t" args
-          then putStrLn $ "Tests pass: " ++ show runAllTests
-          else do
-              input <- readFile =<< head <$> getArgs
-              let raw = case parseHR input of
-                               Left e -> show e
-                               Right l -> concat l
-              when (isBalanced raw) $ putStrLn raw
-
-data Op = IncrementDataPointer
-        | DecrementDataPointer
-        | IncrementByte
-        | DecrementByte
-        | InputByte
-        | OutputByte
-        | JumpForward
-        | JumpBack
 
 test1 = isBalanced "a;" == True
 test2 = isBalanced "a;a;" == True
