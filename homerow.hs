@@ -2,6 +2,7 @@
 
 import Text.ParserCombinators.Parsec
 import System.Environment
+import System.IO
 import Debug.Trace
 import Control.Applicative ((<$>))
 import Control.Monad (unless, when, void, (=<<))
@@ -21,7 +22,16 @@ main = do args <- getArgs
                                Left e -> show e
                                Right l -> concat l
               unless (isBalanced raw) $ error "unbalanced input"
-              genST raw >>= printST
+              --genST raw >>= printST
+              node <- genST raw
+              let state = S.replicate 30000 1
+                  pointer = 0
+                  loop programState = do
+                      res <- step programState
+                      case res of
+                          Nothing -> putStrLn ""
+                          Just ps -> loop ps
+              loop $ ProgramState state (Just node) pointer
 
 data ProgramState = ProgramState (S.Seq Word8) (Maybe Node) Pointer
 
