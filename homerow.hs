@@ -76,6 +76,8 @@ step ps@(ProgramState st mb_node pointer) = do
 
                 OutputByte -> do
                     next <- readIORef $ nNext node
+                    hPutChar stdout (toEnum $ fromIntegral $ S.index st pointer)
+                    hFlush stdout
                     return $ Just $ ProgramState st next pointer
 
                 JumpForward -> do nextJump <- readIORef $ nNextJump node
