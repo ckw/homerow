@@ -81,9 +81,25 @@ step ps@(ProgramState st mb_node pointer) = do
                     return $ Just $ ProgramState st next pointer
 
                 JumpForward -> do nextJump <- readIORef $ nNextJump node
-                                  return $ Just $ ProgramState st nextJump pointer
+                                  if S.index st pointer == 0
+                                  then do
+                                      case nextJump of
+                                          Nothing -> return $ Just $ ProgramState st Nothing pointer
+                                          Just a -> do
+                                              after <- readIORef $ nNext a
+                                              return $ Just $ ProgramState st after pointer
+                                  else do
+                                      next <- readIORef $ nNext node
+                                      return $ Just $ ProgramState st next pointer
                 JumpBack -> do prevJump <- readIORef $ nPrevJump node
-                               return $ Just $ ProgramState st prevJump pointer
+                               if S.index st pointer == 0
+                               then do
+                                   case prevJump of
+                                       Nothing -> return $ Just $ ProgramState st Nothing pointer
+                                       Just _ -> do
+                                           n <- readIORef $ nNext node
+                                           return $ Just $ ProgramState st n pointer
+                                else return $ Just $ ProgramState st prevJump pointer
 
 genST chars = do ops <- sequence $ nodify . charToOpt <$> chars
                  void $ setNext ops
