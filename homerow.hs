@@ -26,6 +26,53 @@ main = do args <- getArgs
 data ProgramState = ProgramState (S.Seq Word8) (Maybe Node) Pointer
 
 type Pointer = Int
+
+step :: ProgramState -> IO (Maybe ProgramState)
+step ps@(ProgramState st mb_node pointer) = do
+    case mb_node of
+        Nothing -> return Nothing
+        Just node ->
+            case nOp node of
+                IncrementDataPointer -> do
+                    let pointer' = pointer + 1
+                    next <- readIORef $ nNext node
+                    if (pointer' == S.length st)
+                    then return $
+                             Just $
+                             ProgramState (st >< (S.replicate pointer' 0 ))
+                                 next (pointer')
+                    else return $ Just $ ProgramState st next pointer'
+
+                DecrementDataPointer -> do
+                    let pointer' = pointer - 1
+                    next <- readIORef $ nNext node
+                    if (pointer' < 0)
+                    then return $
+                             Just $
+                             ProgramState ((S.replicate (S.length st) 0 ) >< st)
+                                 next (S.length st)
+                    else return $ Just $ ProgramState st next pointer'
+
+                IncrementByte -> do let st' = adjust (+1) pointer st
+                                    next <- readIORef $ nNext node
+                                    return $ Just $ ProgramState st' next pointer
+
+                DecrementByte -> do let st' = adjust (\w -> w - 1) pointer st
+                                    next <- readIORef $ nNext node
+                                    return $ Just $ ProgramState st' next pointer
+                InputByte -> do
+                    next <- readIORef $ nNext node
+                    return $ Just $ ProgramState st next pointer
+
+                OutputByte -> do
+                    next <- readIORef $ nNext node
+                    return $ Just $ ProgramState st next pointer
+
+                JumpForward -> do nextJump <- readIORef $ nNextJump node
+                                  return $ Just $ ProgramState st nextJump pointer
+                JumpBack -> do prevJump <- readIORef $ nPrevJump node
+                               return $ Just $ ProgramState st prevJump pointer
+
 genST chars = do ops <- sequence $ nodify . charToOpt <$> chars
                  void $ setNext ops
                  sequence_ $ setSelf <$> ops
