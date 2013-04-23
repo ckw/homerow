@@ -8,9 +8,8 @@ import Control.Applicative ((<$>))
 import Control.Monad (unless, when, void, (=<<))
 import Data.IORef
 import Data.Maybe
-import Data.Sequence ((><))
+import Data.Sequence ((><), adjust)
 import qualified Data.Sequence as S
-import Data.Sequence
 import Data.Word
 
 main = do args <- getArgs
@@ -20,11 +19,14 @@ main = do args <- getArgs
               let variant = if "--traditional" `elem` args
                             then fromTraditional
                             else id
+                  strict =  if "--strict" `elem` args
+                            then isBalanced
+                            else isBalanced'
               input <- fmap variant $ readFile =<< head <$> getArgs
               let raw = case parseHR input of
                                Left e -> show e
                                Right l -> concat l
-              unless (isBalanced raw) $ error "unbalanced input"
+              unless (strict raw) $ error "unbalanced input"
               node <- genST raw
               let state = S.replicate 30000 0
                   pointer = 0
@@ -75,7 +77,7 @@ step ps@(ProgramState st mb_node pointer) = do
                 InputByte -> do
                     next <- readIORef $ nNext node
                     newByte <- fromIntegral . fromEnum <$> hGetChar stdin
-                    let st' = update pointer newByte st
+                    let st' = S.update pointer newByte st
                     return $ Just $ ProgramState st' next pointer
 
                 OutputByte -> do
@@ -227,6 +229,10 @@ line = do code <- sepBy (many (oneOf "asdfjkl;")) (many1 $ oneOf " \t")
 comment = oneOf "#-\"" >> many (noneOf "\n")
 
 parseHR input = parse homerowFile "so much fail" input
+
+isBalanced' input = let open = length $ filter (== 'a') input
+                        close = length $ filter (== ';') input
+                    in open == close
 
 isBalanced input = case parse balance "jumps unbalanced" input of
                        Left _ -> False
