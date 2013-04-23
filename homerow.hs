@@ -74,12 +74,13 @@ step ps@(ProgramState st mb_node pointer) = do
                                     return $ Just $ ProgramState st' next pointer
                 InputByte -> do
                     next <- readIORef $ nNext node
-                    return $ Just $ ProgramState st next pointer
+                    newByte <- fromIntegral . fromEnum <$> hGetChar stdin
+                    let st' = update pointer newByte st
+                    return $ Just $ ProgramState st' next pointer
 
                 OutputByte -> do
                     next <- readIORef $ nNext node
                     hPutChar stdout (toEnum $ fromIntegral $ S.index st pointer)
-                    hFlush stdout
                     return $ Just $ ProgramState st next pointer
 
                 JumpForward -> do nextJump <- readIORef $ nNextJump node
