@@ -25,14 +25,13 @@ main = do args <- getArgs
                                Left e -> show e
                                Right l -> concat l
               unless (isBalanced raw) $ error "unbalanced input"
-              --genST raw >>= printST
               node <- genST raw
-              let state = S.replicate 30000 1
+              let state = S.replicate 30000 0
                   pointer = 0
                   loop programState = do
                       res <- step programState
                       case res of
-                          Nothing -> putStrLn ""
+                          Nothing -> putStr ""
                           Just ps -> loop ps
               loop $ ProgramState state (Just node) pointer
 
