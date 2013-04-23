@@ -17,7 +17,10 @@ main = do args <- getArgs
           if elem "-t" args
           then putStrLn $ "Tests pass: " ++ show runAllTests
           else do
-              input <- readFile =<< head <$> getArgs
+              let variant = if "--traditional" `elem` args
+                            then fromTraditional
+                            else id
+              input <- fmap variant $ readFile =<< head <$> getArgs
               let raw = case parseHR input of
                                Left e -> show e
                                Right l -> concat l
@@ -107,6 +110,18 @@ genST chars = do ops <- sequence $ nodify . charToOpt <$> chars
                  sequence_ $ setNextJump <$> ops
                  sequence_ $ setPrevJump <$> ops
                  return $ head ops
+
+fromTraditional str = convertChar <$> str
+  where convertChar c = case c of
+                            '[' -> 'a'
+                            ']' -> ';'
+                            '>' -> 's'
+                            '<' -> 'd'
+                            ',' -> 'f'
+                            '.' -> 'j'
+                            '+' -> 'k'
+                            '-' -> 'l'
+                            c   -> c
 
 printST node@(Node {..}) = do
     next <- readIORef nNext
