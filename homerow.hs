@@ -203,6 +203,7 @@ charToOpt c = case c of
     'j' -> OutputByte
     'k' -> IncrementByte
     'l' -> DecrementByte
+    c   -> error $ "impossible char: " ++ [c]
 
 data Op = IncrementDataPointer
         | DecrementDataPointer
