@@ -19,21 +19,18 @@ main = do args <- getArgs
               let variant = if "--traditional" `elem` args
                             then fromTraditional
                             else id
-                  strict =  if "--strict" `elem` args
-                            then isBalanced
-                            else isBalanced'
               input <- fmap variant $ readFile =<< head <$> getArgs
               let raw = case parseHR input of
                                Left e -> show e
                                Right l -> concat l
-              unless (strict raw) $ error "unbalanced input"
+              unless (isBalanced raw) $ error "unbalanced input"
               node <- genST raw
               let state = S.replicate 30000 0
                   pointer = 0
                   loop programState = do
                       res <- step programState
                       case res of
-                          Nothing -> putStr ""
+                          Nothing -> return ()
                           Just ps -> loop ps
               loop $ ProgramState state (Just node) pointer
 
@@ -230,22 +227,20 @@ comment = oneOf "#-\"" >> many (noneOf "\n")
 
 parseHR input = parse homerowFile "so much fail" input
 
-isBalanced' input = let open = length $ filter (== 'a') input
-                        close = length $ filter (== ';') input
-                    in open == close
-
 isBalanced input = case parse balance "jumps unbalanced" input of
                        Left _ -> False
                        Right _ -> True
 
 balance' = do
+    nonJumps
     char 'a'
     nonJumps
-    optional balance'
+    many balance'
     nonJumps
     char ';'
+    nonJumps
 
-balance = nonJumps >> optional (many balance') >> nonJumps >> eof
+balance = many balance' >> eof
 
 nonJumps = many (oneOf "sdfjkl")
 
