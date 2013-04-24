@@ -260,6 +260,7 @@ test6 = isBalanced "[...]" == True
 test7 = isBalanced "...]" == False
 test8 = isBalanced "][" == False
 test9 = isBalanced "[][][[]]" == True
+test10 = isBalanced ".[.[.].[.].[.[.].]]" == True
 
 tests = [
           test1
@@ -271,6 +272,7 @@ tests = [
         , test7
         , test8
         , test9
+        , test10
         ]
 
 runAllTests = foldr (&&) True tests
