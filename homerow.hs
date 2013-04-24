@@ -6,21 +6,24 @@ import System.IO
 import qualified System.IO.Error as E
 import Debug.Trace
 import Control.Applicative ((<$>))
+import Control.Arrow (second)
 import Control.Monad (unless, when, void, (=<<))
 import Data.IORef
+import Data.List (partition)
 import Data.Maybe
 import Data.Sequence ((><), adjust)
 import qualified Data.Sequence as S
 import Data.Word
 
-main = do args <- getArgs
-          if elem "-t" args
+main = do (params, filename) <- second (return . head)
+                              . partition (`elem` ["-t","--homerow"]) <$> getArgs
+          if elem "-t" params
           then putStrLn $ "Tests pass: " ++ show runAllTests
           else do
-              let variant = if "--traditional" `elem` args
-                            then fromTraditional
+              let variant = if "--homerow" `elem` params
+                            then fromHomerow
                             else id
-              input <- fmap variant $ readFile =<< head <$> getArgs
+              input <- fmap variant $ readFile =<< filename
               let raw = case parseHR input of
                                Left e -> show e
                                Right l -> concat l
@@ -114,16 +117,16 @@ genST chars = do ops <- sequence $ nodify . charToOpt <$> chars
                  sequence_ $ setPrevJump <$> ops
                  return $ head ops
 
-fromTraditional str = convertChar <$> str
+fromHomerow str = convertChar <$> str
   where convertChar c = case c of
-                            '[' -> 'a'
-                            ']' -> ';'
-                            '>' -> 's'
-                            '<' -> 'd'
-                            ',' -> 'f'
-                            '.' -> 'j'
-                            '+' -> 'k'
-                            '-' -> 'l'
+                            'a' -> '['
+                            ';' -> ']'
+                            's' -> '>'
+                            'd' -> '<'
+                            'f' -> ','
+                            'j' -> '.'
+                            'k' -> '+'
+                            'l' -> '-'
                             c   -> c
 
 printST node@(Node {..}) = do
@@ -198,14 +201,14 @@ data Node = Node
     }
 
 charToOpt c = case c of
-    'a' -> JumpForward
-    ';' -> JumpBack
-    's' -> IncrementDataPointer
-    'd' -> DecrementDataPointer
-    'f' -> InputByte
-    'j' -> OutputByte
-    'k' -> IncrementByte
-    'l' -> DecrementByte
+    '[' -> JumpForward
+    ']' -> JumpBack
+    '>' -> IncrementDataPointer
+    '<' -> DecrementDataPointer
+    ',' -> InputByte
+    '.' -> OutputByte
+    '+' -> IncrementByte
+    '-' -> DecrementByte
     c   -> error $ "impossible char: " ++ [c]
 
 data Op = IncrementDataPointer
@@ -222,7 +225,7 @@ homerowFile = do code <- concat <$> many1 line
                  eof
                  return code
 
-line = do code <- sepBy (many (oneOf "asdfjkl;")) (many1 $ oneOf " \t")
+line = do code <- sepBy (many (oneOf "[]><,.+-")) (many1 $ oneOf " \t")
           optional comment
           char '\n'
           return code
@@ -237,26 +240,26 @@ isBalanced input = case parse balance "jumps unbalanced" input of
 
 balance' = do
     nonJumps
-    char 'a'
+    char '['
     nonJumps
     many balance'
     nonJumps
-    char ';'
+    char ']'
     nonJumps
 
 balance = many balance' >> eof
 
-nonJumps = many (oneOf "sdfjkl")
+nonJumps = many $ oneOf "><,.+-"
 
-test1 = isBalanced "a;" == True
-test2 = isBalanced "a;a;" == True
-test3 = isBalanced "aaa;;;" == True
-test4 = isBalanced "aa;" == False
-test5 = isBalanced "asdf;sdf" == True
-test6 = isBalanced "asdf;" == True
-test7 = isBalanced "sdf;" == False
-test8 = isBalanced ";a" == False
-test9 = isBalanced "a;a;aa;;" == True
+test1 = isBalanced "[]" == True
+test2 = isBalanced "[][]" == True
+test3 = isBalanced "[[[]]]" == True
+test4 = isBalanced "[[]" == False
+test5 = isBalanced "[..].." == True
+test6 = isBalanced "[...]" == True
+test7 = isBalanced "...]" == False
+test8 = isBalanced "][" == False
+test9 = isBalanced "[][][[]]" == True
 
 tests = [
           test1
