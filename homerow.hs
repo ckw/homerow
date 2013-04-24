@@ -3,6 +3,7 @@
 import Text.ParserCombinators.Parsec
 import System.Environment
 import System.IO
+import qualified System.IO.Error as E
 import Debug.Trace
 import Control.Applicative ((<$>))
 import Control.Monad (unless, when, void, (=<<))
@@ -28,11 +29,14 @@ main = do args <- getArgs
               let state = S.replicate 30000 0
                   pointer = 0
                   loop programState = do
-                      res <- step programState
+                      res <- step programState `E.catchIOError` handleEOF
                       case res of
                           Nothing -> return ()
                           Just ps -> loop ps
               loop $ ProgramState state (Just node) pointer
+  where handleEOF e = if E.isEOFError e
+                      then return Nothing
+                      else E.ioError e
 
 data ProgramState = ProgramState (S.Seq Word8) (Maybe Node) Pointer
 
