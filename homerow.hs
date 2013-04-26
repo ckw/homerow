@@ -20,11 +20,11 @@ main = do (params, filename) <- second (return . head)
           if elem "-t" params
           then putStrLn $ "Tests pass: " ++ show runAllTests
           else do
-              let variant = if "--homerow" `elem` params
-                            then fromHomerow
-                            else id
+              let (variant, parseF) = if "--homerow" `elem` params
+                            then (fromHomerow, parseHR)
+                            else (id, parseBF)
               input <- fmap variant $ readFile =<< filename
-              let raw = case parseHR input of
+              let raw = case parseF input of
                                Left e -> show e
                                Right l -> concat l
               unless (isBalanced raw) $ error "unbalanced input"
@@ -221,6 +221,11 @@ data Op = IncrementDataPointer
         | JumpBack
   deriving Show
 
+
+brainfuckFile = do code <- sepBy (many (oneOf "[]><,.+-")) (many1 $ noneOf "[]><,.+-")
+                   eof
+                   return code
+
 homerowFile = do code <- concat <$> many1 line
                  eof
                  return code
@@ -233,6 +238,8 @@ line = do code <- sepBy (many (oneOf "[]><,.+-")) (many1 $ oneOf " \t")
 comment = oneOf "#-\"" >> many (noneOf "\n")
 
 parseHR input = parse homerowFile "so much fail" input
+
+parseBF input = parse brainfuckFile "so much fail" input
 
 isBalanced input = case parse balance "jumps unbalanced" input of
                        Left _ -> False
