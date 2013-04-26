@@ -8,6 +8,7 @@ import Debug.Trace
 import Control.Applicative ((<$>))
 import Control.Arrow (second)
 import Control.Monad (unless, when, void, (=<<))
+import Control.Monad.Fix (fix)
 import Data.IORef
 import Data.List (partition)
 import Data.Maybe
@@ -31,12 +32,12 @@ main = do (params, filename) <- second (return . head)
               node <- genST raw
               let state = S.replicate 30000 0
                   pointer = 0
-                  loop programState = do
-                      res <- step programState `E.catchIOError` handleEOF
-                      case res of
-                          Nothing -> return ()
-                          Just ps -> loop ps
-              loop $ ProgramState state (Just node) pointer
+                  init = ProgramState state (Just node) pointer
+              flip fix init $ \loop state -> do
+                  res <- step state `E.catchIOError` handleEOF
+                  case res of
+                      Nothing -> return ()
+                      Just ps -> loop ps
   where handleEOF e = if E.isEOFError e
                       then return Nothing
                       else E.ioError e
