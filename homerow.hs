@@ -44,10 +44,18 @@ main = do (params, filename) <- second (return . head)
 
 data ProgramState = ProgramState (S.Seq Word8) (Maybe Node) Pointer
 
+instance Show ProgramState where
+    show (ProgramState st node ptr) = (fromMaybe "NOP" $ show <$> node)
+                  ++ ", ptr : "
+                  ++ (show ptr)
+                  ++ ", byte at ptr: "
+                  ++ (show $ S.index st ptr )
+
 type Pointer = Int
 
 step :: ProgramState -> IO (Maybe ProgramState)
 step ps@(ProgramState st mb_node pointer) = do
+    --print ps
     case mb_node of
         Nothing -> return Nothing
         Just node ->
@@ -200,6 +208,9 @@ data Node = Node
     , nSelf     :: IORef (Maybe Node)
     , nOp       :: Op
     }
+
+instance Show Node where
+    show n = show . nOp $ n
 
 charToOpt c = case c of
     '[' -> JumpForward
