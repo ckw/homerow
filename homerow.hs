@@ -89,7 +89,11 @@ step ps@(ProgramState st mb_node pointer) = do
                                     return $ Just $ ProgramState st' next pointer
                 InputByte -> do
                     next <- readIORef $ nNext node
-                    newByte <- fromIntegral . fromEnum <$> hGetChar stdin
+                    let tryReadChar = fromIntegral . fromEnum <$> hGetChar stdin
+                    newByte <- tryReadChar `E.catchIOError`
+                                   \e -> if E.isEOFError e
+                                         then return 0
+                                         else E.ioError e
                     let st' = S.update pointer newByte st
                     return $ Just $ ProgramState st' next pointer
 
