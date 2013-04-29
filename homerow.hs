@@ -34,13 +34,10 @@ main = do (params, filename) <- second (return . head)
                   pointer = 0
                   init = ProgramState state (Just node) pointer
               flip fix init $ \loop state -> do
-                  res <- step state `E.catchIOError` handleEOF
+                  res <- step state
                   case res of
                       Nothing -> return ()
                       Just ps -> loop ps
-  where handleEOF e = if E.isEOFError e
-                      then return Nothing
-                      else E.ioError e
 
 data ProgramState = ProgramState (S.Seq Word8) (Maybe Node) Pointer
 
