@@ -4,10 +4,9 @@ import Text.ParserCombinators.Parsec
 import System.Environment
 import System.IO
 import qualified System.IO.Error as E
-import Debug.Trace
 import Control.Applicative ((<$>))
 import Control.Arrow (second)
-import Control.Monad (unless, when, void, (=<<))
+import Control.Monad (unless, void )
 import Control.Monad.Fix (fix)
 import Data.IORef
 import Data.List (partition)
@@ -16,28 +15,26 @@ import Data.Sequence ((><), adjust)
 import qualified Data.Sequence as S
 import Data.Word
 
+main :: IO ()
 main = do (params, filename) <- second (return . head)
-                              . partition (`elem` ["-t","--homerow"]) <$> getArgs
-          if elem "-t" params
-          then putStrLn $ "Tests pass: " ++ show runAllTests
-          else do
-              let (variant, parseF) = if "--homerow" `elem` params
-                            then (fromHomerow, parseHR)
-                            else (id, parseBF)
-              input <- fmap variant $ readFile =<< filename
-              let raw = case parseF input of
-                               Left e -> show e
-                               Right l -> concat l
-              unless (isBalanced raw) $ error "unbalanced input"
-              node <- genST raw
-              let state = S.replicate 30000 0
-                  pointer = 0
-                  init = ProgramState state (Just node) pointer
-              flip fix init $ \loop state -> do
-                  res <- step state
-                  case res of
-                      Nothing -> return ()
-                      Just ps -> loop ps
+                              . partition (`elem` ["--homerow"]) <$> getArgs
+          let (variant, parseF) = if "--homerow" `elem` params
+                        then (fromHomerow, parseHR)
+                        else (id, parseBF)
+          input <- fmap variant $ readFile =<< filename
+          let raw = case parseF input of
+                           Left e -> show e
+                           Right l -> concat l
+          unless (isBalanced raw) $ error "unbalanced input"
+          node <- genST raw
+          let state = S.replicate 30000 0
+              pointer = 0
+              initial = ProgramState state (Just node) pointer
+          flip fix initial $ \loop st -> do
+              res <- step st
+              case res of
+                  Nothing -> return ()
+                  Just ps -> loop ps
 
 data ProgramState = ProgramState (S.Seq Word8) (Maybe Node) Pointer
 
@@ -120,6 +117,7 @@ step ps@(ProgramState st mb_node pointer) = do
                                           n <- readIORef $ nNext prev
                                           return $ Just $ ProgramState st n pointer
 
+genST :: [Char] -> IO Node
 genST chars = do ops <- sequence $ nodify . charToOpt <$> chars
                  void $ setNext ops
                  sequence_ $ setSelf <$> ops
@@ -137,22 +135,9 @@ fromHomerow str = convertChar <$> str
                             'j' -> '.'
                             'k' -> '+'
                             'l' -> '-'
-                            c   -> c
+                            _   -> c
 
-printST node@(Node {..}) = do
-    next <- readIORef nNext
-    case next of
-        Nothing -> print nOp
-        Just n -> do
-            print nOp
-            self <- readIORef $ nSelf
-            nextJump <- readIORef $ nNextJump
-            prevJump <- readIORef $ nPrevJump
-            when (isJust self) $ print "self set"
-            when (isJust nextJump) $ print "next jump set"
-            when (isJust prevJump) $ print "prev jump set"
-            printST n
-
+nodify :: Op -> IO Node
 nodify nOp = do
               nPrevJump <- newIORef Nothing
               nNextJump <- newIORef Nothing
@@ -171,7 +156,7 @@ setNext (n1:n2:ns) = do void $ writeIORef (nNext n1) $ Just n2
 
 setNextJump node = case nOp node of
     JumpForward -> do next <- readIORef $ nNext node
-                      nextJump <- setNextJump' next 1
+                      nextJump <- setNextJump' next (1 :: Int)
                       void $ writeIORef (nNextJump node) nextJump
                       return node
     _ -> return node
@@ -245,54 +230,31 @@ homerowFile = do code <- concat <$> many1 line
 
 line = do code <- sepBy (many (oneOf "[]><,.+-")) (many1 $ oneOf " \t")
           optional comment
-          char '\n'
+          _ <- char '\n'
           return code
 
 comment = oneOf "#-\"" >> many (noneOf "\n")
 
+parseHR :: [Char] -> Either ParseError [[Char]]
 parseHR input = parse homerowFile "so much fail" input
 
+parseBF :: [Char] -> Either ParseError [[Char]]
 parseBF input = parse brainfuckFile "so much fail" input
 
+isBalanced :: String -> Bool
 isBalanced input = case parse balance "jumps unbalanced" input of
                        Left _ -> False
                        Right _ -> True
 
 balance' = do
-    nonJumps
-    char '['
-    nonJumps
-    many balance'
-    nonJumps
-    char ']'
+    void nonJumps
+    _ <- char '['
+    void nonJumps
+    void $ many balance'
+    void nonJumps
+    _ <- char ']'
     nonJumps
 
 balance = many balance' >> eof
 
 nonJumps = many $ oneOf "><,.+-"
-
-test1 = isBalanced "[]" == True
-test2 = isBalanced "[][]" == True
-test3 = isBalanced "[[[]]]" == True
-test4 = isBalanced "[[]" == False
-test5 = isBalanced "[..].." == True
-test6 = isBalanced "[...]" == True
-test7 = isBalanced "...]" == False
-test8 = isBalanced "][" == False
-test9 = isBalanced "[][][[]]" == True
-test10 = isBalanced ".[.[.].[.].[.[.].]]" == True
-
-tests = [
-          test1
-        , test2
-        , test3
-        , test4
-        , test5
-        , test6
-        , test7
-        , test8
-        , test9
-        , test10
-        ]
-
-runAllTests = foldr (&&) True tests
