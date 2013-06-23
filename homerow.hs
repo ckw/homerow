@@ -196,7 +196,7 @@ data Node = Node
     }
 
 instance Show Node where
-    show n = show . nOp $ n
+    show = show . nOp
 
 charToOpt c = case c of
     '[' -> JumpForward
