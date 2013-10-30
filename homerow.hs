@@ -248,11 +248,11 @@ isBalanced input = case parse balance "jumps unbalanced" input of
 
 balance' = do
     void nonJumps
-    _ <- char '['
+    void $ char '['
     void nonJumps
     void $ many balance'
     void nonJumps
-    _ <- char ']'
+    void $ char ']'
     nonJumps
 
 balance = many balance' >> eof
