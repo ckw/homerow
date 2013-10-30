@@ -246,14 +246,8 @@ isBalanced input = case parse balance "jumps unbalanced" input of
                        Left _ -> False
                        Right _ -> True
 
-balance' = do
-    void nonJumps
-    void $ char '['
-    void nonJumps
-    void $ many balance'
-    void nonJumps
-    void $ char ']'
-    nonJumps
+balance' = nonJumps >> char '[' >> nonJumps >>
+               many balance' >> nonJumps >> char ']' >> nonJumps
 
 balance = many balance' >> eof
 
