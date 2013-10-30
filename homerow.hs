@@ -230,7 +230,7 @@ homerowFile = do code <- concat <$> many1 line
 
 line = do code <- sepBy (many (oneOf "[]><,.+-")) (many1 $ oneOf " \t")
           optional comment
-          _ <- char '\n'
+          void $ char '\n'
           return code
 
 comment = oneOf "#-\"" >> many (noneOf "\n")
