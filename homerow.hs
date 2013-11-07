@@ -30,11 +30,7 @@ main = do (params, filename) <- second (return . head)
           let state = S.replicate 30000 0
               pointer = 0
               initial = ProgramState state (Just node) pointer
-          flip fix initial $ \loop st -> do
-              res <- step st
-              case res of
-                  Nothing -> return ()
-                  Just ps -> loop ps
+          flip fix initial $ \loop st -> step st >>= maybe (return ()) loop
 
 data ProgramState = ProgramState (S.Seq Word8) (Maybe Node) Pointer
 
