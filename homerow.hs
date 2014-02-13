@@ -232,10 +232,10 @@ line = do code <- sepBy (many (oneOf "[]><,.+-")) (many1 $ oneOf " \t")
 comment = oneOf "#-\"" >> many (noneOf "\n")
 
 parseHR :: [Char] -> Either ParseError [[Char]]
-parseHR input = parse homerowFile "so much fail" input
+parseHR input = parse homerowFile "fail" input
 
 parseBF :: [Char] -> Either ParseError [[Char]]
-parseBF input = parse brainfuckFile "so much fail" input
+parseBF input = parse brainfuckFile "fail" input
 
 isBalanced :: String -> Bool
 isBalanced input = case parse balance "jumps unbalanced" input of
